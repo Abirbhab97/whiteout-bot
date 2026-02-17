@@ -1,50 +1,49 @@
-
 const axios = require('axios');
+const cheerio = require('cheerio');
 
-const API_URL = 'https://www.whiteoutsurvival.wiki/api.php';
+const URL = 'https://www.wosrewards.com/';
 
 async function fetchCodes() {
   try {
-    const { data } = await axios.get(API_URL, {
-      params: {
-        action: 'parse',
-        page: 'giftcodes',
-        format: 'json',
-        prop: 'wikitext'
-      }
+    const { data } = await axios.get(URL, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      timeout: 10000
     });
 
-    const wikitext = data?.parse?.wikitext?.['*'];
-
-    if (!wikitext) {
-      console.log("No wikitext returned.");
-      return [];
-    }
-
+    const $ = cheerio.load(data);
     const codes = new Set();
 
-    const matches = wikitext.match(/\b[A-Za-z0-9]{6,25}\b/g);
+    // Look for common code container patterns
+    $('strong, b, span, td, li').each((i, el) => {
+      const text = $(el).text().trim();
 
-    if (matches) {
-      matches.forEach(code => {
+      const match = text.match(/\b[A-Za-z0-9]{6,25}\b/);
+
+      if (match) {
+        const code = match[0];
+
+        // Basic filtering
         if (
-          !code.includes("http") &&
-          !code.includes("Whiteout") &&
-          !code.includes("Century")
+          !code.toLowerCase().includes("http") &&
+          !code.toLowerCase().includes("whiteout") &&
+          !code.toLowerCase().includes("reward")
         ) {
-          codes.add(code.trim());
+          codes.add(code);
         }
-      });
-    }
+      }
+    });
 
     return Array.from(codes);
 
   } catch (err) {
-    console.error("Wiki API error:", err.message);
+    console.error("Scraper error:", err.message);
     return [];
   }
 }
 
 module.exports = { fetchCodes };
+
 
 
