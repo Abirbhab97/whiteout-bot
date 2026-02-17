@@ -13,29 +13,24 @@ async function fetchCodes() {
     });
 
     const $ = cheerio.load(data);
-    const codes = new Set();
+    const codes = [];
 
-    // Look for common code container patterns
-    $('strong, b, span, td, li').each((i, el) => {
-      const text = $(el).text().trim();
+    // Each card container
+    $('div.bg-white').each((i, el) => {
 
-      const match = text.match(/\b[A-Za-z0-9]{6,25}\b/);
+      const statusText = $(el).find('.absolute').text().trim();
+      const codeText = $(el).find('h5').text().trim();
 
-      if (match) {
-        const code = match[0];
+      if (!codeText) return;
 
-        // Basic filtering
-        if (
-          !code.toLowerCase().includes("http") &&
-          !code.toLowerCase().includes("whiteout") &&
-          !code.toLowerCase().includes("reward")
-        ) {
-          codes.add(code);
-        }
+      // Only ACTIVE codes
+      if (statusText.includes('ACTIVE')) {
+        codes.push(codeText);
       }
+
     });
 
-    return Array.from(codes);
+    return codes;
 
   } catch (err) {
     console.error("Scraper error:", err.message);
@@ -44,6 +39,7 @@ async function fetchCodes() {
 }
 
 module.exports = { fetchCodes };
+
 
 
 
