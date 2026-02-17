@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+process.on('unhandledRejection', (reason) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('UNCAUGHT EXCEPTION:', error);
+});
+
 const { Client, GatewayIntentBits } = require('discord.js');
 const cron = require('node-cron');
 const { fetchCodes } = require('./scraper');
@@ -19,8 +28,8 @@ client.once('ready', async () => {
   // Run immediately on startup
   await checkForUpdates();
 
-  // TEMP: Run every minute for debugging
-  cron.schedule('* * * * *', async () => {
+  // Run every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
     console.log('Checking for updates...');
     await checkForUpdates();
   });
@@ -30,15 +39,37 @@ async function checkForUpdates() {
   try {
     console.log("Running scraper...");
 
-    const channel = await client.channels.fetch(process.env.CHANNEL_ID);
-    const rolePing = `<@&${process.env.ROLE_ID}>`;
+    const channelId = process.env.CHANNEL_ID;
 
-    const scrapedCodes = await fetchCodes();
+    if (!channelId) {
+      console.error("CHANNEL_ID is missing in environment variables.");
+      return;
+    }
+
+    const channel = await client.channels.fetch(channelId).catch(err => {
+      console.error("Failed to fetch channel:", err);
+      return null;
+    });
+
+    if (!channel) {
+      console.error("Channel not found or bot has no access.");
+      return;
+    }
+
+    const rolePing = process.env.ROLE_ID
+      ? `<@&${process.env.ROLE_ID}>`
+      : "";
+
+    const scrapedCodes = await fetchCodes().catch(err => {
+      console.error("Scraper failed:", err);
+      return [];
+    });
+
     console.log("Scraped codes:", scrapedCodes);
 
     const activeCodes = await getActiveCodes();
 
-    // Detect new codes
+    // Add new codes
     for (const code of scrapedCodes) {
       const isNew = await saveCode(code);
 
@@ -55,12 +86,13 @@ async function checkForUpdates() {
       await updateLastChecked(code);
     }
 
-    // Detect expired codes
+    // Expire removed codes
     for (const code of activeCodes) {
       if (!scrapedCodes.includes(code)) {
         console.log("Code expired:", code);
 
         await markExpired(code);
+
         await channel.send(
           `⚠️ **Code Expired:** \`${code}\` has been removed from the wiki.`
         );
@@ -68,7 +100,7 @@ async function checkForUpdates() {
     }
 
   } catch (error) {
-    console.error("Error in checkForUpdates:", error);
+    console.error("Error inside checkForUpdates:", error);
   }
 }
 
@@ -87,6 +119,7 @@ client.on('interactionCreate', async interaction => {
         `🎁 **Active Whiteout Survival Gift Codes:**\n\n` +
         codes.map(c => `• ${c}`).join('\n')
       );
+
     } catch (error) {
       console.error("Error handling /codes:", error);
       await interaction.reply("Something went wrong.");
@@ -95,4 +128,5 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
