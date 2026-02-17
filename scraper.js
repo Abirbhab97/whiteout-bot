@@ -8,9 +8,7 @@ async function fetchCodes() {
     const { data } = await axios.get(URL, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Connection": "keep-alive"
+        "Accept-Language": "en-US,en;q=0.9"
       },
       timeout: 10000
     });
@@ -18,17 +16,21 @@ async function fetchCodes() {
     const $ = cheerio.load(data);
     const codes = new Set();
 
-    // Scan entire page text
     const bodyText = $('body').text();
 
     const matches = bodyText.match(/\b[A-Z0-9]{6,20}\b/g);
 
     if (matches) {
       matches.forEach(code => {
+
+        const hasLetter = /[A-Z]/.test(code);
+        const hasNumber = /[0-9]/.test(code);
+
         if (
+          hasLetter &&
+          hasNumber &&
           !code.includes("HTTP") &&
-          !code.includes("WHITEOUT") &&
-          code.length >= 6
+          !code.includes("WHITEOUT")
         ) {
           codes.add(code.trim());
         }
