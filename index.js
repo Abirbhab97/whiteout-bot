@@ -6,7 +6,6 @@ const {
   saveCode,
   markExpired,
   getActiveCodes,
-  getAllCodes,
   updateLastChecked
 } = require('./database');
 
@@ -16,44 +15,60 @@ const client = new Client({
 
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  // Run immediately on startup
   await checkForUpdates();
 
-  cron.schedule('*/15 * * * *', async () => {
+  // TEMP: Run every minute for debugging
+  cron.schedule('* * * * *', async () => {
     console.log('Checking for updates...');
     await checkForUpdates();
   });
 });
 
 async function checkForUpdates() {
-  const channel = await client.channels.fetch(process.env.CHANNEL_ID);
-  const rolePing = `<@&${process.env.ROLE_ID}>`;
+  try {
+    console.log("Running scraper...");
 
-  const scrapedCodes = await fetchCodes();
-  const activeCodes = await getActiveCodes();
+    const channel = await client.channels.fetch(process.env.CHANNEL_ID);
+    const rolePing = `<@&${process.env.ROLE_ID}>`;
 
-  // 1️⃣ Detect new codes
-  for (const code of scrapedCodes) {
-    const isNew = await saveCode(code);
+    const scrapedCodes = await fetchCodes();
+    console.log("Scraped codes:", scrapedCodes);
 
-    if (isNew) {
-      await channel.send(
-        `${rolePing}\n🎁 **New Whiteout Survival Gift Code!**\n\n` +
-        `\`\`\`\n${code}\n\`\`\`\n` +
-        `🔗 Redeem: https://wos-giftcode.centurygame.com/`
-      );
+    const activeCodes = await getActiveCodes();
+
+    // Detect new codes
+    for (const code of scrapedCodes) {
+      const isNew = await saveCode(code);
+
+      if (isNew) {
+        console.log("New code found:", code);
+
+        await channel.send(
+          `${rolePing}\n🎁 **New Whiteout Survival Gift Code!**\n\n` +
+          `\`\`\`\n${code}\n\`\`\`\n` +
+          `🔗 Redeem: https://wos-giftcode.centurygame.com/`
+        );
+      }
+
+      await updateLastChecked(code);
     }
 
-    await updateLastChecked(code);
-  }
+    // Detect expired codes
+    for (const code of activeCodes) {
+      if (!scrapedCodes.includes(code)) {
+        console.log("Code expired:", code);
 
-  // 2️⃣ Detect expired codes (not present anymore)
-  for (const code of activeCodes) {
-    if (!scrapedCodes.includes(code)) {
-      await markExpired(code);
-      await channel.send(
-        `⚠️ **Code Expired:** \`${code}\` has been removed from the wiki.`
-      );
+        await markExpired(code);
+        await channel.send(
+          `⚠️ **Code Expired:** \`${code}\` has been removed from the wiki.`
+        );
+      }
     }
+
+  } catch (error) {
+    console.error("Error in checkForUpdates:", error);
   }
 }
 
@@ -61,17 +76,23 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'codes') {
-    const codes = await getActiveCodes();
+    try {
+      const codes = await getActiveCodes();
 
-    if (!codes.length) {
-      return interaction.reply("No active codes available.");
+      if (!codes.length) {
+        return interaction.reply("No active codes available right now.");
+      }
+
+      await interaction.reply(
+        `🎁 **Active Whiteout Survival Gift Codes:**\n\n` +
+        codes.map(c => `• ${c}`).join('\n')
+      );
+    } catch (error) {
+      console.error("Error handling /codes:", error);
+      await interaction.reply("Something went wrong.");
     }
-
-    await interaction.reply(
-      `🎁 **Active Gift Codes:**\n\n` +
-      codes.map(c => `• ${c}`).join('\n')
-    );
   }
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
