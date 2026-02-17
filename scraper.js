@@ -1,55 +1,50 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
 
-const URL = 'https://www.whiteoutsurvival.wiki/giftcodes/';
+const axios = require('axios');
+
+const API_URL = 'https://www.whiteoutsurvival.wiki/api.php';
 
 async function fetchCodes() {
   try {
-    const { data } = await axios.get(URL, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-      },
-      timeout: 10000
+    const { data } = await axios.get(API_URL, {
+      params: {
+        action: 'parse',
+        page: 'giftcodes',
+        format: 'json',
+        prop: 'wikitext'
+      }
     });
 
-    const $ = cheerio.load(data);
-    const codes = new Set();
+    const wikitext = data?.parse?.wikitext?.['*'];
 
-    // Extract main content text
-    const content = $('#mw-content-text').text();
-
-    if (!content) {
-      console.log("Content not found.");
+    if (!wikitext) {
+      console.log("No wikitext returned.");
       return [];
     }
 
-    const matches = content.match(/\b[A-Za-z0-9]{6,25}\b/g);
+    const codes = new Set();
 
-    if (!matches) return [];
+    const matches = wikitext.match(/\b[A-Za-z0-9]{6,25}\b/g);
 
-    matches.forEach(code => {
-      const isValid =
-        !code.startsWith("http") &&
-        !code.includes("whiteout") &&
-        !code.includes("Whiteout") &&
-        !code.includes("Century") &&
-        !code.includes("January") &&
-        !code.includes("February");
-
-      if (isValid) {
-        codes.add(code.trim());
-      }
-    });
+    if (matches) {
+      matches.forEach(code => {
+        if (
+          !code.includes("http") &&
+          !code.includes("Whiteout") &&
+          !code.includes("Century")
+        ) {
+          codes.add(code.trim());
+        }
+      });
+    }
 
     return Array.from(codes);
 
   } catch (err) {
-    console.error("Scraper error:", err.message);
+    console.error("Wiki API error:", err.message);
     return [];
   }
 }
 
 module.exports = { fetchCodes };
-
 
 
