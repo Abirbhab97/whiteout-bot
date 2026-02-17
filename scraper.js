@@ -7,34 +7,33 @@ async function fetchCodes() {
   try {
     const { data } = await axios.get(URL, {
       headers: {
-        'User-Agent': 'Mozilla/5.0'
-      }
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Connection": "keep-alive"
+      },
+      timeout: 10000
     });
 
     const $ = cheerio.load(data);
-
     const codes = new Set();
 
-    // Look through all text in page
-    $('p, li, td').each((i, el) => {
-      const text = $(el).text();
+    // Scan entire page text
+    const bodyText = $('body').text();
 
-      // Match gift code pattern (5-20 uppercase letters/numbers)
-      const matches = text.match(/\b[A-Z0-9]{5,20}\b/g);
+    const matches = bodyText.match(/\b[A-Z0-9]{6,20}\b/g);
 
-      if (matches) {
-        matches.forEach(code => {
-          // Filter obvious false positives
-          if (
-            !code.includes("HTTP") &&
-            !code.includes("WHITEOUT") &&
-            code.length >= 5
-          ) {
-            codes.add(code.trim());
-          }
-        });
-      }
-    });
+    if (matches) {
+      matches.forEach(code => {
+        if (
+          !code.includes("HTTP") &&
+          !code.includes("WHITEOUT") &&
+          code.length >= 6
+        ) {
+          codes.add(code.trim());
+        }
+      });
+    }
 
     return Array.from(codes);
 
@@ -45,4 +44,5 @@ async function fetchCodes() {
 }
 
 module.exports = { fetchCodes };
+
 
